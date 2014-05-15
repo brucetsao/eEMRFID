@@ -1,9 +1,8 @@
+//#include <SoftwareSerial.h>
+//SoftwareSerial RFID(2, 3); // RX and TX
 #include <LiquidCrystal.h>
-#include <SPI.h>
-#include <RFID.h>
 #include <String.h>
-#define openkeypin 4
-int debugmode = 0; 
+
 /* LiquidCrystal display with:
 
 LiquidCrystal(rs, enable, d4, d5, d6, d7) 
@@ -16,108 +15,182 @@ Parameters
 */
 
 LiquidCrystal lcd(8,9,10,38,40,42,44);   //ok
-RFID rfid(53,5);       //this is used for Arduino Mega 2560
-//RFID rfid(10,5);    //this is used for Arduino UNO
-String keyno1 = String("6AE4E616");
+
+#define openkeypin 4
+int debugmode = 0; 
+int data1 = 0;
+int ok = -1;
+String tag1 = String("0230313034423937343930353803");
+String tag2 = String("0231323030323142423938313003");
+
+//int tag1[14] = {2 ,31 ,32 ,30 ,30 ,32 ,31 ,42 ,42 ,39 ,38 ,31 ,30 ,3};
+//int tag2[14] = {2 ,30 ,31 ,30 ,34 ,42 ,39 ,37 ,34 ,39 ,30 ,35 ,38 ,3};
+byte newtag[14] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // used for read comparisons
+byte cardvalue[14] ; 
+
+#define tonepin 3
+#define relayopendelay 1500 
+
 
 
 void setup()
 {
-  Serial.begin(9600);
-  Serial.println("RFID Mifare Read");
-    SPI.begin(); 
-  rfid.init();
-  pinMode(openkeypin,OUTPUT);
-  digitalWrite(openkeypin,LOW);
-lcd.begin(20, 4);
+    pinMode(openkeypin,OUTPUT);
+  Serial2.begin(9600);    // start serial to RFID reader
+  Serial.begin(9600);  // start serial to PC 
+    Serial.println("RFID EM Tags Read");
+    lcd.begin(20, 4);
 // 設定 LCD 的行列數目 (4 x 20)
- lcd.setCursor(0,0);
+   lcd.setCursor(0,0);
   // 列印 "Hello World" 訊息到 LCD 上 
-lcd.print("RFID Mifare Read"); 
+    lcd.print("RFID EM Tags Read"); 
 }
+
 
 void loop()
-{ 
-// 將游標設到 column 0, line 1 
-// (注意: line 1 是第二行(row)，因為是從 0 開始數起): 
-  if (rfid.isCard()) {                                     //找尋卡片
-          if (rfid.readCardSerial()) {                       //取得卡片的ID+CRC校驗碼
-                        //第0~3個byte:卡片ID
-                        Serial.println(" ");
-                        Serial.print("RFID Card Number is : ");
-			Serial.print(strzero(rfid.serNum[0],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[0],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[0],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[1],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[2],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[3],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[0],HEX);
-                        Serial.print("/");
-			Serial.println(rfid.serNum[0],DEC);
-                        //第4個byte:CRC校驗位元
-                       Serial.print("CRC is : ");
-                       Serial.print(strzero(rfid.serNum[4],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[4],HEX);
-                        Serial.print("/");
-			Serial.println(rfid.serNum[4],DEC);
-                       lcd.setCursor(2, 1); 
-                       lcd.print(strzero(rfid.serNum[0],2,16)); 
-                       lcd.setCursor(5, 1); 
-                       lcd.print(strzero(rfid.serNum[1],2,16)); 
-                       lcd.setCursor(8, 1); 
-                       lcd.print(strzero(rfid.serNum[2],2,16)); 
-                       lcd.setCursor(11, 1); 
-                       lcd.print(strzero(rfid.serNum[3],2,16)); 
-                       lcd.setCursor(4, 2); 
-                       lcd.print(getcardnumber(rfid.serNum[0],rfid.serNum[1],rfid.serNum[2],rfid.serNum[3]) ); 
-                        
-          }
-          
-    }   
-    rfid.halt();        //命令卡片進入休眠狀態
-    if (keyno1 == getcardnumber(rfid.serNum[0],rfid.serNum[1],rfid.serNum[2],rfid.serNum[3]))
-      {
-            digitalWrite(openkeypin,HIGH);
-            lcd.setCursor(0, 3); 
-           lcd.print("Access Granted:Open"); 
-           Serial.println("Access Granted:Door Open"); 
-      }
-      else
-      {
-            digitalWrite(openkeypin,LOW);
-            lcd.setCursor(0, 3); 
-           lcd.print("Access Denied:Closed"); 
-           Serial.println("Access Denied:Door Closed"); 
-      }
-      
+{
+   if  (readTags(&newtag[0])) 
+   {
+        Serial.print("Card Number is :(") ;
+        Serial.print(getcardnumber(&newtag[0])) ;
+        Serial.print(")\n") ;
+         lcd.setCursor(1,1);
+        lcd.print("                     "); 
+         lcd.setCursor(1,1);
+        lcd.print(getcardnumberA(&newtag[0])); 
+         lcd.setCursor(1,2);
+        lcd.print("                     "); 
+         lcd.setCursor(1,1);
+        lcd.print(getcardnumberB(&newtag[0])); 
+        if (getcardnumber(&newtag[0]) == tag1)
+            {
+              opendoor();
+            }
+            else
+            {
+              closedoor();
+            }
             
-    delay(500);         //延時0.5秒
+   }
+
 }
 
-String getcardnumber(byte c1, byte c2, byte c3, byte c4)
+
+void opendoor()
 {
-   String retstring = String("");
-    retstring.concat(strzero(c1,2,16));
-    retstring.concat(strzero(c2,2,16));
-    retstring.concat(strzero(c3,2,16));
-    retstring.concat(strzero(c4,2,16));
-    return retstring;
+          digitalWrite(openkeypin,HIGH);
+            lcd.setCursor(0, 3); 
+       lcd.print("Access Granted:Open"); 
+       Serial.println("Access Granted:Door Open"); 
+      delay(relayopendelay) ;
+       digitalWrite(openkeypin,LOW);
 }
+
+void closedoor()
+{
+        digitalWrite(openkeypin,LOW);
+        lcd.setCursor(0, 3); 
+       lcd.print("Access Denied:Closed"); 
+       Serial.println("Access Denied:Door Closed"); 
+}
+
+boolean comparetag(int aa[14], int bb[14])
+{
+  boolean ff = false;
+  int fg = 0;
+  for (int cc = 0 ; cc < 14 ; cc++)
+  {
+    if (aa[cc] == bb[cc])
+    {
+      fg++;
+    }
+  }
+  if (fg == 14)
+  {
+    ff = true;
+  }
+  return ff;
+}
+
+boolean readTags(byte *data)
+{
+  boolean temp = false;
+
+  if (Serial2.available() > 0) 
+  {
+    // read tag numbers
+    delay(100); // needed to allow time for the data to come in from the serial buffer.
+
+    for (int z = 0 ; z < 14 ; z++) // read the rest of the tag
+    {
+      data1 = Serial2.read();
+      *(data+z) = data1;
+    }
+     temp = true ;
+   // Serial2.flush(); // stops multiple reads
+
+    // do the tags match up?
+   // checkmytags();
+  }
+
+  // now do something based on tag type
+   return temp ;
+}
+
+String getcardnumber(byte *cc)
+{
+    return joinCardBytes(cc, 14) ;
+}
+
+String getcardnumberA(byte *cc)
+{
+    return joinCardBytes(cc, 7) ;
+}
+
+String getcardnumberB(byte *cc)
+{
+    return joinCardBytes(cc+7, 7) ;
+}
+
+String joinCardBytes(byte *cc, int len)
+{
+  String retstring = String("");
+  int i = 0 ;
+for (i = 0 ; i < len; i++)
+  {
+      retstring.concat(strzero(*(cc+i),2,16) );
+  }
+      return retstring;
+}
+
+void decryptkey(String kk)
+{
+  int tmp1,tmp2,tmp3,tmp4 ;
+  tmp1 = unstrzero(kk.substring(0, 2) ,16);
+  tmp2 = unstrzero(kk.substring(2, 4) ,16);
+  tmp3 = unstrzero(kk.substring(4, 6) ,16);
+  tmp4 = unstrzero(kk.substring(6, 8) ,16);
+  cardvalue[0] = tmp1 ;
+  cardvalue[1] = tmp2 ;
+  cardvalue[2] = tmp3 ;
+  cardvalue[3] = tmp4 ;
+       if (debugmode == 1)
+      {
+          Serial.print("decryptkey key : ");
+          Serial.print("key1 =");
+          Serial.print(kk);
+          Serial.print(":(");
+          Serial.println(tmp1,HEX);
+          Serial.print("/");
+          Serial.print(tmp2,HEX);
+          Serial.print("/");
+          Serial.print(tmp3,HEX);
+          Serial.print("/");
+          Serial.print(tmp4,HEX);
+          Serial.print(")");
+          Serial.println("");
+      }
+} 
 
 String strzero(long num, int len, int base)
 {
@@ -153,7 +226,7 @@ String strzero(long num, int len, int base)
   return retstring;
 }
 
-unsigned long unstrzero(String hexstr)
+unsigned long unstrzero(String hexstr, int base)
 {
   String chkstring  ;
   int len = hexstr.length() ;
@@ -175,7 +248,7 @@ unsigned long unstrzero(String hexstr)
       hexstr.toUpperCase() ;
            tmp = hexstr.charAt(i) ;   // give i th char and return this char
            tmp1 = hexcode.indexOf(tmp) ;
-      tmpnum = tmpnum + tmp1* POW(16,(len -i -1) )  ;
+      tmpnum = tmpnum + tmp1* POW(base,(len -i -1) )  ;
  
       if (debugmode == 1)
       {
@@ -214,3 +287,5 @@ long POW(long num, int expo)
    return tmp ; 
   }
 }
+
+

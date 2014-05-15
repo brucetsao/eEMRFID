@@ -1,16 +1,12 @@
 #include <EEPROM.h>
 #include <LiquidCrystal.h>
-#include <SPI.h>
-#include <RFID.h>
 #include <String.h>
 #include "pitches.h"
 #include <Keypad.h>
 
-
 #define openkeypin 4
 int debugmode = 0; 
 #define relayopendelay 1500 
-
 #define tonepin 3
 /* LiquidCrystal display with:
 
@@ -24,27 +20,34 @@ Parameters
 */
 
 LiquidCrystal lcd(8,9,10,38,40,42,44);   //ok
-RFID rfid(53,5);       //this is used for Arduino Mega 2560
-//RFID rfid(10,5);    //this is used for Arduino UNO
-String keyno1 = String("6AE4E616");
-String padkey1 = String("A123456");
+String tag1 = String("0230313034423937343930353803");
+String tag2 = String("0231323030323142423938313003");
+
+//int tag1[14] = {2 ,31 ,32 ,30 ,30 ,32 ,31 ,42 ,42 ,39 ,38 ,31 ,30 ,3};
+//int tag2[14] = {2 ,30 ,31 ,30 ,34 ,42 ,39 ,37 ,34 ,39 ,30 ,35 ,38 ,3};
+byte newtag[14] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // used for read comparisons
+byte cardvalue[14] ; 
+// this is EEPROM Address  =====
 int keycontroladdress = 10;
 int keystartaddress = 20;
 int keypadcontroladdress = 16;
 int keyspadtartaddress = 560;
-
-byte cardvalue[4] ; 
+// this is EEPROM Address  =====
 int Maxkey = 0 ;
 int PadMaxkey = 0 ;
+// this for all key data store in EEPROM
 String Keylist[100] ;
 String PadKeylist[100] ;
-// notes in the melody:
+String keyno1;
+String padkey1 = String("A123456");
+
 int melody[] = {
    NOTE_C4, NOTE_G3,NOTE_G3, NOTE_A3, NOTE_G3,0, NOTE_B3, NOTE_C4};
 
 // note durations: 4 = quarter note, 8 = eighth note, etc.:
 int noteDurations[] = {
    4, 8, 8, 4,4,4,4,4 };
+// this for keypad 4*4
 
 const byte ROWS = 4; //four rows
 const byte COLS = 4; //four columns
@@ -63,116 +66,64 @@ byte colPins[COLS] = {41, 43, 45, 47}; //connect to the column pinouts of the ke
 Keypad customKeypad =  Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
 char customKey ;
 
+
 void setup()
 {
-  Serial.begin(9600);
-  Serial.println("RFID Mifare Read");
-    SPI.begin(); 
-  rfid.init();
-  pinMode(openkeypin,OUTPUT);
-  digitalWrite(openkeypin,LOW);
-lcd.begin(20, 4);
+    pinMode(openkeypin,OUTPUT);
+    digitalWrite(openkeypin,LOW);
+    Serial2.begin(9600);    // start serial to RFID reader
+    Serial.begin(9600);  // start serial to PC 
+    Serial.println("RFID EM Tags Read");
+    lcd.begin(20, 4);
 // 設定 LCD 的行列數目 (4 x 20)
- lcd.setCursor(0,0);
+   lcd.setCursor(0,0);
   // 列印 "Hello World" 訊息到 LCD 上 
-lcd.print("RFID Mifare Read"); 
-getAllKey(keycontroladdress,keystartaddress) ;
-getAllPadKey(keypadcontroladdress ,keyspadtartaddress ) ;
-//testtone();
+    lcd.print("RFID EM Tags Read"); 
+     getAllKey(keycontroladdress,keystartaddress) ;
+    getAllPadKey(keypadcontroladdress ,keyspadtartaddress ) ;
+
 }
 
 void loop()
 { 
-  boolean readcardok = false ;
-// 將游標設到 column 0, line 1 
-// (注意: line 1 是第二行(row)，因為是從 0 開始數起): 
-  if (rfid.isCard()) {                                     //找尋卡片
-          if (rfid.readCardSerial()) {   
-            readcardok = true ;
-            //取得卡片的ID+CRC校驗碼
-                        //第0~3個byte:卡片ID
-                        Serial.println(" ");
-                        Serial.print("RFID Card Number is : ");
-			Serial.print(strzero(rfid.serNum[0],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[0],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[0],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[1],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[1],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[2],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[2],HEX);
-                        Serial.print("/");
-			Serial.print(rfid.serNum[2],DEC);
-                        Serial.print(" , ");
-			Serial.print(strzero(rfid.serNum[3],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[3],HEX);
-                        Serial.print("/");
-			Serial.println(rfid.serNum[3],DEC);
-                        //第4個byte:CRC校驗位元
-                       Serial.print("CRC is : ");
-                       Serial.print(strzero(rfid.serNum[4],2,16));
-                        Serial.print("/");
-			Serial.print(rfid.serNum[4],HEX);
-                        Serial.print("/");
-			Serial.println(rfid.serNum[4],DEC);
-                       lcd.setCursor(2, 1); 
-                       lcd.print(strzero(rfid.serNum[0],2,16)); 
-                       lcd.setCursor(5, 1); 
-                       lcd.print(strzero(rfid.serNum[1],2,16)); 
-                       lcd.setCursor(8, 1); 
-                       lcd.print(strzero(rfid.serNum[2],2,16)); 
-                       lcd.setCursor(11, 1); 
-                       lcd.print(strzero(rfid.serNum[3],2,16)); 
-                        
-          }
-          
-    }   
-    rfid.halt();        //命令卡片進入休眠狀態
-    if (readcardok)   // new card readed
-    {
-        keyno1 = getcardnumber(rfid.serNum[0],rfid.serNum[1],rfid.serNum[2],rfid.serNum[3]) ;
+     if  (readTags(&newtag[0])) 
+   {
+           keyno1 = getcardnumber(&newtag[0]) ;
+        Serial.print("Card Number is :(") ;
+        Serial.print(keyno1) ;
+        Serial.print(")\n") ;
+        LCDdispTag(keyno1);
           if (checkAllKey(keyno1) )
             {
-                  digitalWrite(openkeypin,HIGH);
-                      lcd.setCursor(0, 3); 
-                 lcd.print("Access Granted:Open"); 
-                 Serial.println("Access Granted:Door Open"); 
-                 passtone();
-                delay(relayopendelay) ;
-                 digitalWrite(openkeypin,LOW);
+              opendoor();
             }
             else
             {
-               //   digitalWrite(openkeypin,LOW);
-                  lcd.setCursor(0, 3); 
-                 lcd.print("Access Denied:Closed"); 
-                 nopasstone();
-                 Serial.println("Access Denied:Door Closed"); 
-            }
-    }  
+               closedoor() ;
+            } 
+   }
+
     customKey = customKeypad.getKey();  
   if (customKey){
     keypadtone();
-     // Serial.println(customKey);
+      Serial.println(customKey);
         if (customKey == '*')
            {
               chkpadpassword();
            } 
          if (customKey == 'D')  
               {     
-                  Serial.print("now enter inserting passwords \n");
-                   insertpassword();
+                  Serial.print("now enter New Tag Card \n");
+                   insertTagKey();
               }
-                
+         if (customKey == 'C')  
+              {     
+                   Serial.print("Now Write all new  password\n") ;
+                      writeAllTagKey() ;    
+                   getAllKey(keycontroladdress,keystartaddress) ;    
+              }
   }    
+            
     delay(500);         //延時0.5秒
 }
 
@@ -206,33 +157,36 @@ void chkpadpassword()
         //-------------
 }
 
-void insertpassword()
+void insertTagKey()
 {
-      boolean ckflag = false ;
-        keyno1 = getpadkeyin() ;
-        while (keyno1 != "*" )
-        {
-          if (  PadMaxkey  <= 100)
-             {
-                  PadMaxkey ++ ;
-                 ckflag = true ;
-                 PadKeylist[PadMaxkey-1]   = String(keyno1) ;
-                      keyno1 = getpadkeyin() ;
-                      Serial.print("Now enter password is :(");
+        while (1)
+         {
+              if (readTags(&newtag[0])) 
+                {
+                     keyno1 = getcardnumber(&newtag[0]) ;
+                      Serial.print("New Card Number is :(") ;
                       Serial.print(keyno1) ;
-                      Serial.print(")\n");
-                      
-             }
-              else
-             {
-                break ;
-             } 
-        //-------------
-        }
- if (ckflag)
-       Serial.print("Now Write all new  password\n") ;
-     writeAllPadKey() ;
-}
+                      Serial.print(")\n") ;
+                      LCDdispTag(keyno1);
+              
+                        if (  Maxkey  < 100)
+                           {
+                                Maxkey ++ ;
+                                 Keylist[Maxkey-1]   = keyno1 ;
+                                Serial.print("Now enter password is :(");
+                                Serial.print(Maxkey);
+                                Serial.print("/");
+                                Serial.print(keyno1) ;
+                                Serial.print(")\n");
+                                passtone() ;
+      
+                           }
+                return ;
+                }           
+         }
+ }
+         
+         
 String getpadkeyin()
 {
 
@@ -246,15 +200,29 @@ String getpadkeyin()
    {
      if (customKey){
            keypadtone();
-       //   Serial.println(customKey);
+        Serial.println(customKey);
          lcd.print(customKey); 
             tmpstr.concat(customKey);
             } 
        customKey = customKeypad.getKey();
    }
-   keydowntone();
   return tmpstr ;
 }
+
+
+void checkMasterKey(String kk)
+{
+        if (kk == tag1)
+            {
+              opendoor();
+            }
+            else
+            {
+              closedoor();
+            }
+  
+}
+
 boolean checkAllKey(String kk)
 {
   if (debugmode == 1)
@@ -300,7 +268,7 @@ boolean checkAllPadKey(String kk)
   if (PadMaxkey > 0 )
     for (i = 0 ; i < (PadMaxkey ) ; i ++)
       {  
-       //   if (debugmode == 1)
+       if (debugmode == 1)
              { 
                   Serial.print("Compare internal passwords value is  :(");
                   Serial.print(i);
@@ -319,15 +287,6 @@ boolean checkAllPadKey(String kk)
 
 
 
-String getcardnumber(byte c1, byte c2, byte c3, byte c4)
-{
-   String retstring = String("");
-    retstring.concat(strzero(c1,2,16));
-    retstring.concat(strzero(c2,2,16));
-    retstring.concat(strzero(c3,2,16));
-    retstring.concat(strzero(c4,2,16));
-    return retstring;
-}
 
 void getAllKey(int controlarea, int keyarea)
 {
@@ -343,7 +302,7 @@ void getAllKey(int controlarea, int keyarea)
      {
          for(i = 0 ; i < (Maxkey); i++)
            {
-               Keylist[i] = String(readkey(keyarea+(i*10) ) );
+               Keylist[i] = readkey(keyarea+(i*20), &cardvalue[0])  ;
           if (debugmode == 1)
             {              
                Serial.print("inter key is :(");
@@ -356,7 +315,6 @@ void getAllKey(int controlarea, int keyarea)
      }
 
 }
-
 
 void getAllPadKey(int controlarea, int keyarea)
 {
@@ -385,6 +343,7 @@ void getAllPadKey(int controlarea, int keyarea)
      }
 
 }
+
 
 
 
@@ -424,6 +383,7 @@ int getKeyinSizeCount(int keycontrol)
   return tmp ;
 }
 
+
 int getPadKeyinSizeCount(int keycontrol)
 {
       if (debugmode == 1)
@@ -462,67 +422,110 @@ int getPadKeyinSizeCount(int keycontrol)
 
 
 
-void decryptkey(String kk)
+void decryptkey(String kk, byte *dd)
 {
-  int tmp1,tmp2,tmp3,tmp4 ;
-  tmp1 = unstrzero(kk.substring(0, 2) ,16);
-  tmp2 = unstrzero(kk.substring(2, 4) ,16);
-  tmp3 = unstrzero(kk.substring(4, 6) ,16);
-  tmp4 = unstrzero(kk.substring(6, 8) ,16);
-  cardvalue[0] = tmp1 ;
-  cardvalue[1] = tmp2 ;
-  cardvalue[2] = tmp3 ;
-  cardvalue[3] = tmp4 ;
+  int tmp1,i ;
+ if (debugmode == 1)
+    {
+        Serial.print("decryptkey key : ");
+        Serial.print("key1 =");
+        Serial.print(kk);
+        Serial.print(":(");
+    }
+    
+  for (i = 0 ; i <14; i++)
+    {
+        tmp1 = unstrzero(kk.substring(i*2, (i+1)*2) ,16);
+        *(dd+i) = tmp1 ;
+    }
        if (debugmode == 1)
       {
-          Serial.print("decryptkey key : ");
-          Serial.print("key1 =");
-          Serial.print(kk);
-          Serial.print(":(");
           Serial.println(tmp1,HEX);
           Serial.print("/");
-          Serial.print(tmp2,HEX);
-          Serial.print("/");
-          Serial.print(tmp3,HEX);
-          Serial.print("/");
-          Serial.print(tmp4,HEX);
-          Serial.print(")");
-          Serial.println("");
       }
+          Serial.print(")");
+          Serial.print("\n");
 } 
 
-String readkey(int keyarea)
+String readkey(int keyarea, byte *dd)
 {
-    int k1,k2,k3,k4 ;
-    k1 = EEPROM.read(keyarea);
-    k2 = EEPROM.read(keyarea+1);
-    k3 = EEPROM.read(keyarea+2);
-    k4 = EEPROM.read(keyarea+3);
+    int kk,i ;
       if (debugmode == 1)
       {
           Serial.print("read key : ");
           Serial.print("key1 =(");
-          Serial.println(k1,HEX);
-          Serial.print("/");
-          Serial.print(k2,HEX);
-          Serial.print("/");
-          Serial.print(k3,HEX);
-          Serial.print("/");
-          Serial.print(k4,HEX);
+      }
+      
+       for (i = 0; i< 14; i++)
+       {
+         kk = EEPROM.read(keyarea+i);
+        *(dd+i) = kk ;
+              if (debugmode == 1)
+              {
+                  Serial.println(kk,HEX);
+                  Serial.print("/");
+              }
+       }
+      if (debugmode == 1)
+        {
           Serial.print(")");
           Serial.println("");
-      }
-    return getcardnumber(k1,k2,k3,k4);
+        }
+    return getcardnumber(dd);
 }
 
-void writekey(int keyarea)
+void writekey(int keyarea, byte *dd)
 {
-    EEPROM.write(keyarea, cardvalue[0]);
-    EEPROM.write(keyarea+1, cardvalue[1]);
-    EEPROM.write(keyarea+2, cardvalue[2]);
-    EEPROM.write(keyarea+3, cardvalue[3]);
-    
+      int kk,i ;
+ for (i = 0; i< 14; i++)
+       {
+          EEPROM.write(keyarea+i, *(dd+i));
+       }
+   
 }
+
+
+void writeAllTagKey()
+{
+  int i = 0 ;
+// if (debugmode == 1)
+      {
+          Serial.print("now write Tag key data is :(");
+          Serial.print(keycontroladdress );
+          Serial.print("/");
+          Serial.print(Maxkey);
+          Serial.print(")\n");
+      }
+        EEPROM.write(keycontroladdress, 100);  //mean activate key store function
+      EEPROM.write(keycontroladdress+2, Maxkey);  //mean activate key store function
+
+    for(i = 0 ; i < Maxkey ; i++)
+    {
+    //   if (debugmode == 1)
+   //       {
+              Serial.print("now write pad key str is :(");
+              Serial.print(i);
+              Serial.print("/");
+              Serial.print(Keylist[i]);
+              Serial.print(")\n");
+    //      }
+          decryptkey(Keylist[i],&cardvalue[0]) ;
+          writekey(keystartaddress +(i*20),&cardvalue[0]);
+
+          //          EEPROM.write(keyarea + i, str.charAt(i)); 
+    }    
+ 
+          writeTagKeyHead(keypadcontroladdress,Maxkey );
+
+}
+
+void writeTagKeyHead(int keyarea, int pk)
+{
+  EEPROM.write(keyarea, 100);  //mean activate key store function
+  EEPROM.write(keyarea+2, pk);  //mean activate key store function
+
+}
+
 
 String readpadkey(int keyarea)
 {
@@ -564,70 +567,6 @@ String readpadkey(int keyarea)
     return tmpstr;
 }
 
-void writeAllPadKey()
-{
-  int i = 0 ;
- if (debugmode == 1)
-      {
-          Serial.print("now write pad key data is :(");
-          Serial.print(keypadcontroladdress);
-          Serial.print("/");
-          Serial.print(PadMaxkey);
-          Serial.print(")\n");
-      }
-      
-    for(i = 0 ; i < PadMaxkey ; i++)
-    {
-       if (debugmode == 1)
-          {
-              Serial.print("now write pad key str is :(");
-              Serial.print(i);
-              Serial.print("/");
-              Serial.print(PadKeylist[i]);
-              Serial.print(")\n");
-          }
-          writepadkey(keyspadtartaddress+(i*10),PadKeylist[i] );
-          //          EEPROM.write(keyarea + i, str.charAt(i)); 
-    }    
- 
-          writePadKeyHead(keypadcontroladdress,(byte)PadMaxkey );
-
-}
-
-void writePadKeyHead(int keyarea, byte pk)
-{
-  EEPROM.write(keyarea, 100);  //mean activate key store function
-  EEPROM.write(keyarea+2, pk);  //mean activate key store function
-
-}
-
-void writepadkey(int keyarea, String str)
-{
-  int i = 0 ;
- if (debugmode == 1)
-      {
-          Serial.print("now write pad key data is :(");
-          Serial.print(keyarea);
-          Serial.print("/");
-          Serial.print(str);
-          Serial.print(")\n");
-      }
-      
-    for(i = 0 ; i < str.length() ; i++)
-    {
-       if (debugmode == 1)
-          {
-              Serial.print("now write pad key str is :(");
-              Serial.print(i);
-              Serial.print("/");
-              Serial.print(str.charAt(i));
-              Serial.print(")\n");
-          }
-          EEPROM.write(keyarea + i, str.charAt(i));
-    }    
-            EEPROM.write(keyarea + str.length(),NULL);
-
-}
 
 String strzero(long num, int len, int base)
 {
@@ -725,25 +664,77 @@ long POW(long num, int expo)
   }
 }
 
-void testtone()
+String getcardnumber(byte *cc)
 {
-  for (int thisNote = 0; thisNote < 8; thisNote++) {
-
-     // to calculate the note duration, take one second 
-     // divided by the note type.
-     //e.g. quarter note = 1000 / 4, eighth note = 1000/8, etc.
-     int noteDuration = 1000/noteDurations[thisNote];
-     tone(tonepin, melody[thisNote],noteDuration);
-
-     // to distinguish the notes, set a minimum time between them.
-     // the note's duration + 30% seems to work well:
-     int pauseBetweenNotes = noteDuration * 1.30;
-     delay(pauseBetweenNotes);
-     // stop the tone playing:
-     noTone(8);
-   }
- 
+    return joinCardBytes(cc, 14) ;
 }
+String getcardnumberA(byte *cc)
+{
+    return joinCardBytes(cc, 7) ;
+}
+
+String getcardnumberB(byte *cc)
+{
+    return joinCardBytes(cc+7, 7) ;
+}
+
+String joinCardBytes(byte *cc, int len)
+{
+  String retstring = String("");
+  int i = 0 ;
+for (i = 0 ; i < len; i++)
+  {
+      retstring.concat(strzero(*(cc+i),2,16) );
+  }
+      return retstring;
+}
+
+boolean readTags(byte *data)
+{
+  boolean temp = false;
+  byte data1 ;
+  if (Serial2.available() > 0) 
+  {
+    // read tag numbers
+    delay(100); // needed to allow time for the data to come in from the serial buffer.
+
+    for (int z = 0 ; z < 14 ; z++) // read the rest of the tag
+    {
+      data1 = Serial2.read();
+      *(data+z) = data1;
+    }
+     temp = true ;
+   // Serial2.flush(); // stops multiple reads
+
+    // do the tags match up?
+   // checkmytags();
+  }
+
+  // now do something based on tag type
+   return temp ;
+}
+
+
+void opendoor()
+{
+          digitalWrite(openkeypin,HIGH);
+            lcd.setCursor(0, 3); 
+          passtone();
+       lcd.print("Access Granted:Open"); 
+       Serial.println("Access Granted:Door Open"); 
+      delay(relayopendelay) ;
+       digitalWrite(openkeypin,LOW);
+}
+
+void closedoor()
+{
+        digitalWrite(openkeypin,LOW);
+        nopasstone() ;
+        lcd.setCursor(0, 3); 
+       lcd.print("Access Denied:Closed"); 
+       Serial.println("Access Denied:Door Closed"); 
+}
+
 
 void passtone()
 {
@@ -775,14 +766,17 @@ void keypadtone()
 
 }
 
-void keydowntone()
+void LCDdispTag(String kk)
 {
-         tone(tonepin,NOTE_E5 ) ;
-         delay(130);
-         tone(tonepin,NOTE_E5 ) ;
-         delay(130);
-         noTone(tonepin);
-
+         lcd.setCursor(1,1);
+        lcd.print("                     "); 
+         lcd.setCursor(1,1);
+        lcd.print(kk.substring(0,14)); 
+         lcd.setCursor(1,2);
+        lcd.print("                     "); 
+         lcd.setCursor(1,2);
+        lcd.print(kk.substring(15,28)); 
+  
+  
 }
-
 

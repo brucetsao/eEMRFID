@@ -12,12 +12,6 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Now Write key data") ;
   // 在 keycontroladdress = 20 上寫入數值100
-  EEPROM.write(keycontroladdress, 100);  //mean activate key store function
-  EEPROM.write(keycontroladdress+2, 2);  //mean activate key store function
-  decryptkey(key1);
-  writekey(keystartaddress);
-  decryptkey(key2);
-  writekey(keystartaddress+20);
   if (EEPROM.read(keycontroladdress) == 100)
     {
           Serial.println("key data Stored in EEPROM") ;

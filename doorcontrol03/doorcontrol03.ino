@@ -2,6 +2,7 @@
 //SoftwareSerial RFID(2, 3); // RX and TX
 #include <LiquidCrystal.h>
 #include <String.h>
+#include "pitches.h"
 
 
 /* LiquidCrystal display with:
@@ -19,8 +20,9 @@ LiquidCrystal lcd(8,9,10,38,40,42,44);   //ok
 
 #define openkeypin 4
 int debugmode = 0; 
-int data1 = 0;
-int ok = -1;
+String tag1 = String("0230313034423937343930353803");
+String tag2 = String("0231323030323142423938313003");
+
 //int tag1[14] = {2 ,31 ,32 ,30 ,30 ,32 ,31 ,42 ,42 ,39 ,38 ,31 ,30 ,3};
 //int tag2[14] = {2 ,30 ,31 ,30 ,34 ,42 ,39 ,37 ,34 ,39 ,30 ,35 ,38 ,3};
 byte newtag[14] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // used for read comparisons
@@ -29,7 +31,12 @@ byte cardvalue[14] ;
 #define tonepin 3
 #define relayopendelay 1500 
 
+int melody[] = {
+   NOTE_C4, NOTE_G3,NOTE_G3, NOTE_A3, NOTE_G3,0, NOTE_B3, NOTE_C4};
 
+// note durations: 4 = quarter note, 8 = eighth note, etc.:
+int noteDurations[] = {
+   4, 8, 8, 4,4,4,4,4 };
 
 void setup()
 {
@@ -60,11 +67,57 @@ void loop()
         lcd.print("                     "); 
          lcd.setCursor(1,1);
         lcd.print(getcardnumberB(&newtag[0])); 
-     
+        if (getcardnumber(&newtag[0]) == tag1)
+            {
+              opendoor();
+            }
+            else
+            {
+              closedoor();
+            }
+            
    }
 
 }
 
+
+void opendoor()
+{
+          digitalWrite(openkeypin,HIGH);
+            lcd.setCursor(0, 3); 
+       lcd.print("Access Granted:Open"); 
+       Serial.println("Access Granted:Door Open"); 
+       passtone();
+      delay(relayopendelay) ;
+       digitalWrite(openkeypin,LOW);
+}
+
+void closedoor()
+{
+        digitalWrite(openkeypin,LOW);
+        lcd.setCursor(0, 3); 
+       lcd.print("Access Denied:Closed"); 
+       nopasstone();
+       Serial.println("Access Denied:Door Closed"); 
+}
+
+boolean comparetag(int aa[14], int bb[14])
+{
+  boolean ff = false;
+  int fg = 0;
+  for (int cc = 0 ; cc < 14 ; cc++)
+  {
+    if (aa[cc] == bb[cc])
+    {
+      fg++;
+    }
+  }
+  if (fg == 14)
+  {
+    ff = true;
+  }
+  return ff;
+}
 
 boolean readTags(byte *data)
 {
@@ -242,5 +295,36 @@ long POW(long num, int expo)
   }
 }
 
+
+
+void passtone()
+{
+         tone(tonepin,NOTE_E5 ) ;
+         delay(300);
+         noTone(tonepin);
+
+}
+
+void nopasstone()
+{
+  int delaytime = 150 ;
+  int i = 0 ;
+  for (i = 0 ;i<3;i++)
+        {
+          tone(tonepin,NOTE_E5,delaytime) ;
+    //      tone(tonepin,NOTE_C4,delaytime) ;
+       //   tone(tonepin,NOTE_C5,delaytime ) ;
+        delay(delaytime);
+        }
+      noTone(tonepin);
+}
+
+void keypadtone()
+{
+         tone(tonepin,NOTE_E5 ) ;
+         delay(130);
+         noTone(tonepin);
+
+}
 
 
